@@ -86,11 +86,11 @@ class RC6:
         # unpack the 16 bytes in 4 registers (A, B, C, D) - 32 bits
         A, B, C, D = struct.unpack('<4I', plaintext_bytes)
 
-        # pre-whitening
+        # 1. pre-whitening
         B = (B + self.S[0]) & self.MASK32
         D = (D + self.S[1]) & self.MASK32
 
-        # 20 rounds - Generalized Feistel Network
+        # 2. 20 rounds - Generalized Feistel Network
         # t and u f(x) = x(2x+1)
         for i in range(1, 21):
             t = self.rotate_left((B * ((2 * B) + 1)) & self.MASK32, 5)
@@ -103,11 +103,48 @@ class RC6:
             # register permutation
             A, B, C, D = B, C, D, A
 
-        # post-whitening
+        # 3. post-whitening
         A = (A + self.S[42]) & self.MASK32
         C = (C + self.S[43]) & self.MASK32
 
         # repacking the 4 register into an encrypted 16 bytes block
+        return struct.pack('<4I', A, B, C, D)
+    
+    # III. decrypt block
+    def decrypt_block(self, ciphertext_bytes):
+        """
+        Decrypts a fixed-size 16 bytes block.
+        Performs the exact reverse operations of encrypt_block.
+        """
+        if len(ciphertext_bytes) != 16:
+            raise ValueError("The block size must be 16 bytes!")
+        
+        # unpack the encrypted 16 bytes in 4 registers
+        A, B, C, D = struct.unpack('<4I', ciphertext_bytes)
+
+        # 1. undo post-whitening
+        C = (C - self.S[43]) & self.MASK32
+        A = (A - self.S[42]) & self.MASK32
+
+        # 2. 20 rounds backwards (from 20 down to 1)
+        for i in range(20, 0, -1):
+            # undo register permutation: (A, B, C, D) = (D, A, B, C)
+            A, B, C, D = D, A, B, C
+
+            # recompute t and u (formulas are identical because B and D are unchanged!)
+            t = self.rotate_left((B * ((2 * B) + 1)) & self.MASK32, 5)
+            u = self.rotate_left((D * ((2 * D) + 1)) & self.MASK32, 5)
+
+            # undo key addition and data dependent rotation
+            # subtraction instead of addition, rotate_right instead of rotate_left
+            C = (self.rotate_right((C - self.S[2 * i + 1]) & self.MASK32, t) ^ u)
+            A = (self.rotate_right((A - self.S[2 * i]) & self.MASK32, u) ^ t)
+
+        # 3. undo pre-whitening
+        D = (D - self.S[1]) & self.MASK32
+        B = (B - self.S[0]) & self.MASK32
+
+        # repack the original plaintext
         return struct.pack('<4I', A, B, C, D)
 
 
@@ -173,3 +210,25 @@ if __name__ == "__main__":
         print("=" * 40)
     else:
         print("[ERROR] The results don't match the expected ones. Retry.")
+
+    print("\nDECRYPTION TEST:")
+    print("Testing Vector 1 Decryption...")
+    
+    # decrypting the first ciphertext
+    decrypted_bytes = rc6.decrypt_block(ct_bytes)
+    
+    print(f"Original plaintext:  {plaintext.hex(' ')}")
+    print(f"Decrypted plaintext: {decrypted_bytes.hex(' ')}")
+
+    decrypted_bytes2 = rc62.decrypt_block(ct_bytes2)
+    
+    print(f"Original plaintext:  {plaintext2.hex(' ')}")
+    print(f"Decrypted plaintext: {decrypted_bytes2.hex(' ')}")
+    
+    if (decrypted_bytes == plaintext) and (decrypted_bytes2 == plaintext2):
+        print("[SUCCESS] Decryption works. Got the original data back.")
+        print("Third test ended.")
+        print("=" * 40)
+    else:
+        print("[ERROR] Decryption failed. Something got mixed up. Retry")
+    
