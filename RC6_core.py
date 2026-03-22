@@ -15,7 +15,7 @@ class RC6:
         Waits for a key of 16 bytes (128 bits) to be provided
         """
 
-        if len(key_bytes) !=16:
+        if len(key_bytes) != 16:
             raise ValueError("The inserted key must be exactly 16 bytes (128 bits)!")
         
         # pseudo-random "magical" constants used for initializing the S array
