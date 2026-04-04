@@ -110,7 +110,7 @@ class RC6_CBC:
 
     
 if __name__ == "__main__":
-    print(" CBC WRAPPER ENCRYPTION/DECRYPTION TEST")
+    print("CBC WRAPPER ENCRYPTION/DECRYPTION TEST")
     
     #  key (must be exactly 16 bytes)
     master_key = b"SECRET_PASSWORD!"

@@ -205,14 +205,14 @@ if __name__ == "__main__":
     print(f"Obtained ciphertext: {ct_bytes2.hex(' ')}")
 
     if (ct_bytes.hex(' ') == expected_formatted) and (ct_bytes2.hex(' ') == expected_formatted2):
-        print("[SUCCESS] The results match the expected ones.")
+        print("\n[SUCCESS] The results match the expected ones.")
         print("Second test ended.")
         print("=" * 40)
     else:
         print("[ERROR] The results don't match the expected ones. Retry.")
 
     print("\nDECRYPTION TEST:")
-    print("Testing Vector 1 Decryption...")
+    print("\nTesting Vector 1 Decryption...")
     
     # decrypting the first ciphertext
     decrypted_bytes = rc6.decrypt_block(ct_bytes)
@@ -221,12 +221,12 @@ if __name__ == "__main__":
     print(f"Decrypted plaintext: {decrypted_bytes.hex(' ')}")
 
     decrypted_bytes2 = rc62.decrypt_block(ct_bytes2)
-    
+    print("")
     print(f"Original plaintext:  {plaintext2.hex(' ')}")
     print(f"Decrypted plaintext: {decrypted_bytes2.hex(' ')}")
     
     if (decrypted_bytes == plaintext) and (decrypted_bytes2 == plaintext2):
-        print("[SUCCESS] Decryption works. Got the original data back.")
+        print("\n[SUCCESS] Decryption works. Got the original data back.")
         print("Third test ended.")
         print("=" * 40)
     else:
