@@ -3,6 +3,8 @@ import socket
 import threading
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
 
 class MasterNode:
     """
@@ -73,18 +75,29 @@ class MasterNode:
                 except socket.timeout:
                     continue
             
-                # accept an incoming connection from a Node
-                print(f"[MASTER] New connection accepted from node: {client_address[0]}:{client_address[1]}")
+                # receive the Publick key from the Node
+                pub_key_bytes = client_socket.recv(4096)
+                print("[MASTER] Received Public Key from Node")
 
-                # receives the greeting
-                data_received = client_socket.recv(1024).decode('utf_8')
-                print(f"[MASTER] Received message: {data_received}")
+                # load the bytes into a Cryptography Public Key Object
+                node_public_key = serialization.load_pem_public_key(pub_key_bytes)
 
-                # send the securely generated DEK (sent as hex string for now)
-                raspuns = f"WELCOME_DEK:{self.dek.hex()}"
-                client_socket.sendall(raspuns.encode('utf-8'))
+                # encapsulation/inception - encrypting the DEK using the Node's Public Key
+                print("[MASTER] Encrypting DEK with the Node's RSA Public Key...")
+                encrypted_dek = node_public_key.encrypt(
+                    self.dek,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
 
-                # close connection for this node
+                # send the encrypted payload back to the Node
+                print(f"[MASTER] Sending encrypted DEK ({len(encrypted_dek)} bytes) over the network...")
+                client_socket.sendall(encrypted_dek)
+
+                # close connection for the current node
                 client_socket.close()
                 print("[MASTER] Connection closed. Waiting for the next node...\n")
 
