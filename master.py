@@ -227,7 +227,7 @@ class MasterNode:
                 print("\n[*] Broadcasting PING...")
                 active_peers = []
                 
-                for ip in self.known_peers:
+                for ip in self.lista_peers:
                     try:
                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         s.settimeout(1.0) # waiting 1 s 
@@ -243,7 +243,7 @@ class MasterNode:
                         print(f"  [-] {ip} gave no response. Eliminated!")
                 
                 # updating the peers 
-                self.known_peers = active_peers
+                self.lista_peers = active_peers
                 print("[*] Refresh completed.")
                 continue
 
