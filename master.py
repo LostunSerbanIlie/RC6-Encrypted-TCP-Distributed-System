@@ -189,7 +189,8 @@ class MasterNode:
             time.sleep(0.5) # delay to keep the console clean
             print("\nMASTER P2P MENU")
             print("1. Send text message")
-            print("2. Quit (Shuts down network)")
+            print("2. Refresh peers")
+            print("quit (Shuts down network)")
             
             lista_peers = list(self.peers - {self.host})
             if not lista_peers:
@@ -217,7 +218,9 @@ class MasterNode:
                 except (ValueError, IndexError):
                     print("[!] Invalid selection.")
 
-            elif choice == '2' or choice == 'quit':
+            elif choice == '2':
+                continue # refresh 
+            elif choice == 'quit':
                 print("\n[MASTER] Exit command received. Shutting down gracefully...")
                 self.shutdown_flag.set()
                 break
