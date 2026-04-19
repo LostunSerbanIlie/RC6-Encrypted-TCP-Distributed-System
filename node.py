@@ -162,6 +162,10 @@ class PeerNode:
             s.close()
         except Exception as e:
             print(f"[ERROR] Could not send data to {target_ip}: {e}")
+            
+            if target_ip in self.known_peers:
+                self.known_peers.remove(target_ip)
+                print(f"[AUTO-CLEANUP] {target_ip} is offline. Deleting it from the peers table.")
 
     def menu(self):
         """Interactive Terminal Menu"""
