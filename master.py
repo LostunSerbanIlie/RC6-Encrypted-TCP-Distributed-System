@@ -23,6 +23,9 @@ class MasterNode:
         self.rc6_engine = None
         self.shutdown_flag = threading.Event()
 
+        # List of active peers for menu logic
+        self.lista_peers = []
+
     def derive_dek(self, password: str):
         """
         Derives a perfect 16-byte DEK using Password-Based Key Derivation Function 2
@@ -195,8 +198,12 @@ class MasterNode:
             print("\nMASTER P2P MENU")
             print("1. Send text message")
             print("2. Refresh peers")
-            print("quit (Shuts down network)")
+            print("3 or 'quit' (Shuts down network)")
             
+            # Always ensure self.peers is a set
+            if isinstance(self.peers, list):
+                self.peers = set(self.peers)
+
             lista_peers = list(self.peers - {self.host})
             if not lista_peers:
                 print("(0 nodes connected yet)")
@@ -223,31 +230,35 @@ class MasterNode:
                 except (ValueError, IndexError):
                     print("[!] Invalid selection.")
 
+
             elif choice == '2':
                 print("\n[*] Broadcasting PING...")
-                active_peers = []
-                
-                for ip in self.lista_peers:
+                active_peers = set()
+                offline_peers = set()
+
+                for ip in self.peers:
+                    if ip == self.host:
+                        continue  # Don't ping self
                     try:
                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         s.settimeout(1.0) # waiting 1 s 
                         s.connect((ip, self.p2p_port))
-                        
                         # sending a 256 bytes to respect the header structure
                         s.sendall("PING".ljust(256, '\x00').encode('utf-8'))
                         s.close()
-                        
-                        active_peers.append(ip)
+                        active_peers.add(ip)
                         print(f"  [+] {ip} is ONLINE")
                     except Exception:
                         print(f"  [-] {ip} gave no response. Eliminated!")
-                
-                # updating the peers 
-                self.lista_peers = active_peers
+                        offline_peers.add(ip)
+
+                # remove offline peers from self.peers
+                self.peers -= offline_peers
+
                 print("[*] Refresh completed.")
                 continue
 
-            elif choice == 'quit':
+            elif choice == 'quit' or choice == '3':
                 print("\n[MASTER] Exit command received. Shutting down gracefully...")
                 self.shutdown_flag.set()
                 break
