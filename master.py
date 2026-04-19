@@ -126,6 +126,11 @@ class MasterNode:
             try:
                 header = client_socket.recv(256).decode('utf-8').strip('\x00')
                 
+                # keep-alive mechanism
+                if not header or header == "PING":
+                    client_socket.close()
+                    continue
+
                 # receives special UPDATE_PEERS packet (redundant for Master, but kept for safety)
                 if header.startswith("UPDATE_PEERS|"):
                     client_socket.close()
@@ -219,7 +224,29 @@ class MasterNode:
                     print("[!] Invalid selection.")
 
             elif choice == '2':
-                continue # refresh 
+                print("\n[*] Broadcasting PING...")
+                active_peers = []
+                
+                for ip in self.known_peers:
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(1.0) # waiting 1 s 
+                        s.connect((ip, self.p2p_port))
+                        
+                        # sending a 256 bytes to respect the header structure
+                        s.sendall("PING".ljust(256, '\x00').encode('utf-8'))
+                        s.close()
+                        
+                        active_peers.append(ip)
+                        print(f"  [+] {ip} is ONLINE")
+                    except Exception:
+                        print(f"  [-] {ip} gave no response. Eliminated!")
+                
+                # updating the peers 
+                self.known_peers = active_peers
+                print("[*] Refresh completed.")
+                continue
+
             elif choice == 'quit':
                 print("\n[MASTER] Exit command received. Shutting down gracefully...")
                 self.shutdown_flag.set()

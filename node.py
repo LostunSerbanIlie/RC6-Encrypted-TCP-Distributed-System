@@ -19,7 +19,8 @@ class PeerNode:
         # auto-detect our own IP so we don't send files to ourselves
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            s.connect(('8.8.8.8', 1))
+            # finding the IP based on the master connection
+            s.connect((self.master_host, self.master_port))
             self.my_ip = s.getsockname()[0]
         except Exception:
             self.my_ip = '127.0.0.1'
@@ -90,6 +91,11 @@ class PeerNode:
                 # read the Metadata header (256 bytes)
                 header = client_socket.recv(256).decode('utf-8').strip('\x00')
                 
+                # ignores pings and empty connections
+                if not header or header == "PING":
+                    client_socket.close()
+                    continue
+
                 # check if it is an update from Master
                 if header.startswith("UPDATE_PEERS|"):
                     _, peer_str = header.split('|')
@@ -208,8 +214,29 @@ class PeerNode:
                     print("[!] Invalid ID.")
                     
             elif choice == '2':
-                continue # loops back and re-prints the menu
+                print("\n[*] Broadcasting PING...")
+                active_peers = []
                 
+                for ip in self.known_peers:
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(1.0) # waiting 1 s 
+                        s.connect((ip, self.p2p_port))
+                        
+                        # sending a 256 bytes to respect the header structure
+                        s.sendall("PING".ljust(256, '\x00').encode('utf-8'))
+                        s.close()
+                        
+                        active_peers.append(ip)
+                        print(f"  [+] {ip} is ONLINE")
+                    except Exception:
+                        print(f"  [-] {ip} gave no response. Eliminated!")
+                
+                # updating the peers 
+                self.known_peers = active_peers
+                print("[*] Refresh completed.")
+                continue
+            
             elif choice == '3' or choice == 'quit':
                 print("Shutting down Node...")
                 self.shutdown_flag.set()
