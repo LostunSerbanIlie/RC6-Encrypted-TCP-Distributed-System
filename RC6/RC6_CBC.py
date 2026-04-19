@@ -1,6 +1,6 @@
 import os
 import struct
-from RC6_core import RC6
+from RC6.RC6_core import RC6
 
 class RC6_CBC:
     """
