@@ -133,7 +133,7 @@ if __name__ == "__main__":
     print(f"Recovered message: '{decrypted_message.decode('utf-8')}'")
     
     if long_message == decrypted_message:
-         print("\n[SUCCESS] The CBC Wrapper works flawlessly! Ready for network integration.")
+         print("\n[SUCCESS] The CBC Wrapper works.")
     else:
          print("\n[ERROR] Something went wrong in the CBC chaining process.")
     print("=" * 50)

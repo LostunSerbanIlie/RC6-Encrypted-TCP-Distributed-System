@@ -1,8 +1,6 @@
 import socket
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
+import custom_rsa
+
 
 class PeerNode:
     def __init__(self, master_host='192.168.56.1', master_port=8000):
@@ -13,22 +11,18 @@ class PeerNode:
         self.network_dek = None
 
         # generating the RSA key pair
-        print("[*] Generating local RSA-2048 key pair...")
-        self.private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-        )
-        self.public_key = self.private_key.public_key()
+        # it returnes 2 tuples ((e, N), (d, N))
+        print("[*] Generating local RSA-1024 key pair...")
+        self.public_key, self.private_key = custom_rsa.generate_keypair(1024)
 
     def get_serialized_public_key(self):
         """
-        Converts the Public Key object into a bytes format (PEM) 
-        so it can be sent over the TCP socket.
+        Converts our custom Public Key (e, N) into a string format
+        encoded as bytes, so it can be sent over the TCP socket.
         """
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
+        e, N = self.public_key
+        # makes an "e,N" string and transforms it into bytes
+        return f"{e},{N}".encode('utf-8')
 
     def connect_to_master(self):
         """
@@ -40,7 +34,7 @@ class PeerNode:
         client_socket.connect((self.master_host, self.master_port))
 
         # sends the public key to the master
-        pub_key_bytes = self._get_serialized_public_key()
+        pub_key_bytes = self.get_serialized_public_key()
         print("[*] Sending Public Key to Master...")
         client_socket.sendall(pub_key_bytes)
 
@@ -49,16 +43,10 @@ class PeerNode:
         encrypted_dek = client_socket.recv(4096)
         print(f"[*] Received encrypted payload from Master ({len(encrypted_dek)} bytes).")
 
-        # decrypt the payload using our Private Key
+        # decrypt the payload using our Private Key an custom math
         print("[*] Decrypting network DEK using local Private Key...")
-        self.network_dek = self.private_key.decrypt(
-            encrypted_dek,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
+        # calls the method that does M = C^d mod N
+        self.network_dek = custom_rsa.decrypt(self.private_key, encrypted_dek)
 
         print(f"\n[SUCCESS] DEK successfully recovered!")
         print(f" -> Recovered DEK (hex): {self.network_dek.hex(' ')}")

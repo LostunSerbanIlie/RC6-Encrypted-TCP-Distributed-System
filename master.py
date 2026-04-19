@@ -1,10 +1,9 @@
 import os
 import socket
 import threading
+import custom_rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import serialization
 
 class MasterNode:
     """
@@ -75,23 +74,17 @@ class MasterNode:
                 except socket.timeout:
                     continue
             
-                # receive the Publick key from the Node
-                pub_key_bytes = client_socket.recv(4096)
-                print("[MASTER] Received Public Key from Node")
+                # receive the Custom Public key from the Node (string format "e,N")
+                pub_key_str = client_socket.recv(4096).decode('utf-8')
+                print("[MASTER] Received Custom Public Key from Node")
 
-                # load the bytes into a Cryptography Public Key Object
-                node_public_key = serialization.load_pem_public_key(pub_key_bytes)
+                # load the numbers into a tuple of Integers
+                e_str, N_str = pub_key_str.split(',')
+                node_public_key = (int(e_str), int(N_str))
 
-                # encapsulation/inception - encrypting the DEK using the Node's Public Key
-                print("[MASTER] Encrypting DEK with the Node's RSA Public Key...")
-                encrypted_dek = node_public_key.encrypt(
-                    self.dek,
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
+                # encapsulation/inception - encrypting the DEK using our Custom RSA
+                print("[MASTER] Encrypting DEK with the Node's Custom RSA Public Key...")
+                encrypted_dek = custom_rsa.encrypt(node_public_key, self.dek)
 
                 # send the encrypted payload back to the Node
                 print(f"[MASTER] Sending encrypted DEK ({len(encrypted_dek)} bytes) over the network...")
