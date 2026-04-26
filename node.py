@@ -291,6 +291,8 @@ class PeerNode:
                         # displaying the file size
                         file_size_kb = os.path.getsize(filepath) / 1024
                         print(f"[*] Selected: {filepath} ({file_size_kb:.2f} KB)")
+                        self.send_file_p2p(target_ip, filepath)
+
                     else:
                         print("[-] Selection canceled.")
                 except (ValueError, IndexError):
