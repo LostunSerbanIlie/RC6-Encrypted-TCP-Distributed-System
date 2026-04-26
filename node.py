@@ -190,8 +190,6 @@ class PeerNode:
                     mb_sent = bytes_sent / (1024 * 1024)
                     total_mb = filesize / (1024 * 1024)
                     print(f"  -> Uploaded: {mb_sent:.1f} MB / {total_mb:.2f} MB", end='\r')
-                    
-            print(f"\n[SUCCESS] File sent successfully to {target_ip}!")
                 
             print(f"[SUCCESS] File sent successfully to {target_ip}!")
             s.close()

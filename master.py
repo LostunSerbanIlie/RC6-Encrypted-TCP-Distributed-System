@@ -310,6 +310,7 @@ class MasterNode:
                         # displaying the file size
                         file_size_kb = os.path.getsize(filepath) / 1024
                         print(f"[*] Selected: {filepath} ({file_size_kb:.2f} KB)")
+                        self.send_file_p2p(target_ip, filepath)
                     else:
                         print("[-] Selection canceled.")
                 except (ValueError, IndexError):
@@ -342,7 +343,7 @@ class MasterNode:
                 print("[*] Refresh completed.")
                 continue
 
-            elif choice == 'quit' or choice == '3':
+            elif choice == 'quit' or choice == '4':
                 print("\n[MASTER] Exit command received. Shutting down gracefully...")
                 self.shutdown_flag.set()
                 break
