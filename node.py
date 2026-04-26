@@ -118,12 +118,22 @@ class PeerNode:
 
                 # recompile the chunks
                 received_data = b""
-                while len(received_data) < filesize:
+                bytes_received = 0
+                
+                while bytes_received < filesize:
                     chunk = client_socket.recv(1024)
                     if not chunk: break
                     received_data += chunk
+                    bytes_received += len(chunk)
+                    
+                    # updating progress for every MB
+                    if bytes_received % (1024 * 1024) == 0 or bytes_received == filesize:
+                        mb_recv = bytes_received / (1024 * 1024)
+                        total_mb = filesize / (1024 * 1024)
+                        print(f"  -> Downloaded: {mb_recv:.1f} MB / {total_mb:.2f} MB", end='\r')
                 
-                print("[*] All chunks received. Decrypting with RC6...")
+                print("\n[*] All chunks received. Decrypting with RC6 (This might take a while for large files)...")
+                
                 # decrypt the full assembled payload
                 decrypted_data = self.rc6_engine.decrypt(received_data)
                 
@@ -169,8 +179,19 @@ class PeerNode:
             s.sendall(header)
             
             # CHUNKING: send the encrypted data in blocks of 1024 bytes
+            bytes_sent = 0
             for i in range(0, filesize, 1024):
-                s.sendall(ciphertext[i : i + 1024])
+                chunk = ciphertext[i : i + 1024]
+                s.sendall(chunk)
+                bytes_sent += len(chunk)
+                
+                # shows progress for every MB sent
+                if bytes_sent % (1024 * 1024) == 0 or bytes_sent == filesize:
+                    mb_sent = bytes_sent / (1024 * 1024)
+                    total_mb = filesize / (1024 * 1024)
+                    print(f"  -> Uploaded: {mb_sent:.1f} MB / {total_mb:.2f} MB", end='\r')
+                    
+            print(f"\n[SUCCESS] File sent successfully to {target_ip}!")
                 
             print(f"[SUCCESS] File sent successfully to {target_ip}!")
             s.close()
@@ -231,6 +252,9 @@ class PeerNode:
                     print(f"  [{idx}] {ip}")
 
             choice = input("\nChoose option: ").strip().lower()
+            
+            if not choice:
+                continue
 
             if choice == '1':
                 if not self.known_peers:
@@ -264,8 +288,9 @@ class PeerNode:
                     filepath = filedialog.askopenfilename(title="Choose a file to send")
                     
                     if filepath:
-                        print(f"[*] Selected: {filepath}")
-                        self.send_file_p2p(target_ip, filepath)
+                        # displaying the file size
+                        file_size_kb = os.path.getsize(filepath) / 1024
+                        print(f"[*] Selected: {filepath} ({file_size_kb:.2f} KB)")
                     else:
                         print("[-] Selection canceled.")
                 except (ValueError, IndexError):
