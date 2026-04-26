@@ -5,6 +5,9 @@ import time
 import custom_rsa
 from RC6.RC6_CBC import RC6_CBC 
 
+import tkinter as tk
+from tkinter import filedialog
+
 class PeerNode:
     def __init__(self, master_host='192.168.56.1', master_port=8000, p2p_port=9000):
         self.master_host = master_host
@@ -108,7 +111,7 @@ class PeerNode:
                     client_socket.close()
                     continue 
                     
-                #  normal P2P file transfer
+                # normal P2P file transfer
                 filename, filesize_str = header.split('|')
                 filesize = int(filesize_str)
                 print(f"\n[INCOMING] Receiving file: {filename} from {addr[0]} ({filesize} encrypted bytes)")
@@ -124,11 +127,16 @@ class PeerNode:
                 # decrypt the full assembled payload
                 decrypted_data = self.rc6_engine.decrypt(received_data)
                 
-                # save to disk
-                save_path = f"node_received_{filename}"
-                with open(save_path, "wb") as f:
-                    f.write(decrypted_data)
-                print(f"[SUCCESS] File decrypted and saved as: {save_path}\n")
+                # logic for file or message reception
+                if filename == "DIRECT_MSG":
+                    message = decrypted_data.decode('utf-8')
+                    print(f"\n[DECRYPTED direct message received from {addr[0]}]: {message}\n")
+                else:
+                    # save to disk
+                    save_path = f"node_received_{filename}"
+                    with open(save_path, "wb") as f:
+                        f.write(decrypted_data)
+                    print(f"[SUCCESS] File decrypted and saved as: {save_path}\n")
                 
             except Exception as e:
                 print(f"[ERROR] P2P Reception failed: {e}")
@@ -173,6 +181,33 @@ class PeerNode:
                 self.known_peers.remove(target_ip)
                 print(f"[AUTO-CLEANUP] {target_ip} is offline. Deleting it from the peers table.")
 
+    def send_direct_msg(self, target_ip, text_msg):
+        """Encrypts and sends a direct message from RAM to a known node"""
+        ciphertext = self.rc6_engine.encrypt(text_msg.encode('utf-8'))
+        msg_len = len(ciphertext)
+
+        # adding the DIRECT_MSG header so the listener knows how to handle it
+        header = f"DIRECT_MSG|{msg_len}".ljust(256, '\x00').encode('utf-8')
+
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((target_ip, self.p2p_port))
+            s.sendall(header)
+
+            # chunking the message in 1024 bytes pieces
+            for i in range(0, msg_len, 1024):
+                s.sendall(ciphertext[i : i + 1024])
+                
+            print("[SUCCESS] Direct message sent!")
+            s.close()
+
+        except Exception as e:
+            print(f"\n[ERROR] Cannot send to {target_ip} (Error: {e})")
+            # auto-cleanup logic for the agenda
+            if target_ip in self.known_peers:
+                self.known_peers.remove(target_ip)
+                print(f"[AUTO-CLEANUP] {target_ip} is offline. Deleting it from the peers table.")
+
     def menu(self):
         """Interactive Terminal Menu"""
         # start the listener on a background thread
@@ -184,8 +219,9 @@ class PeerNode:
             print("\n")
             print(" NODE P2P MENU")
             print("1. Send text message")
-            print("2. Refresh peers")
-            print("3. Quit")
+            print("2. Send file (local file)")
+            print("3. Refresh peers")
+            print("4 or 'quit'")
             
             if not self.known_peers:
                 print("\n(No other peers online yet)")
@@ -206,14 +242,36 @@ class PeerNode:
                     target_ip = self.known_peers[int(target_idx)]
                     msg = input("Write your secret message: ")
                     
-                    # create a temporary file to send
-                    with open("node_msg.txt", "w") as f: 
-                        f.write(msg)
-                    self.send_file_p2p(target_ip, "node_msg.txt")
+                    self.send_direct_msg(target_ip, msg) # calling the send method
                 except (ValueError, IndexError):
                     print("[!] Invalid ID.")
                     
             elif choice == '2':
+                if not self.known_peers:
+                    print("[!] Routing table is empty! Wait for others to connect.")
+                    continue
+                    
+                target_idx = input("Choose peer ID ([0], [1]...): ")
+                try:
+                    target_ip = self.known_peers[int(target_idx)]
+                    
+                    # GUI file picker
+                    print("[*] Opening file selection dialog...")
+                    root = tk.Tk()
+                    root.withdraw() # Hide the main empty window
+                    root.attributes('-topmost', True) # Bring to front
+                    
+                    filepath = filedialog.askopenfilename(title="Choose a file to send")
+                    
+                    if filepath:
+                        print(f"[*] Selected: {filepath}")
+                        self.send_file_p2p(target_ip, filepath)
+                    else:
+                        print("[-] Selection canceled.")
+                except (ValueError, IndexError):
+                    print("[!] Invalid ID.")
+                    
+            elif choice == '3':
                 print("\n[*] Broadcasting PING...")
                 active_peers = []
                 
@@ -237,7 +295,7 @@ class PeerNode:
                 print("[*] Refresh completed.")
                 continue
             
-            elif choice == '3' or choice == 'quit':
+            elif choice == '4' or choice == 'quit':
                 print("Shutting down Node...")
                 self.shutdown_flag.set()
                 break

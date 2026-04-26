@@ -7,6 +7,9 @@ from RC6.RC6_CBC import RC6_CBC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+import tkinter as tk
+from tkinter import filedialog
+
 class MasterNode:
     """
     The central Master Node responsible for generating the DEK,
@@ -152,10 +155,15 @@ class MasterNode:
                 
                 decrypted_data = self.rc6_engine.decrypt(received_data)
                 
-                save_path = f"master_received_{filename}"
-                with open(save_path, "wb") as f:
-                    f.write(decrypted_data)
-                print(f"[MASTER-P2P] File saved as: {save_path}\n")
+                # logic for file or message reception
+                if filename == "DIRECT_MSG":
+                    message = decrypted_data.decode('utf-8')
+                    print(f"\n[DECRYPTED direct message received from {addr[0]}]: {message}\n")
+                else:
+                    save_path = f"master_received_{filename}"
+                    with open(save_path, "wb") as f:
+                        f.write(decrypted_data)
+                    print(f"[MASTER-P2P] File saved as: {save_path}\n")
                 
             except Exception as e:
                 print(f"[MASTER-P2P] Reception error: {e}")
@@ -189,16 +197,44 @@ class MasterNode:
             print("[SUCCESS] File sent successfully!")
             s.close()
         except Exception as e:
-            print(f"[ERROR] Failed connection to {target_ip}: {e}")    
+            print(f"[ERROR] Failed connection to {target_ip}: {e}")
+
+    def send_direct_msg(self, target_ip, text_msg):
+        """Encrypts and sends a direct message from RAM to a known node"""
+        ciphertext = self.rc6_engine.encrypt(text_msg.encode('utf-8'))
+        msg_len = len(ciphertext)
+
+        # adding the DIRECT_MSG header so the listener knows how to handle it
+        header = f"DIRECT_MSG|{msg_len}".ljust(256, '\x00').encode('utf-8')
+
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((target_ip, 9000))
+            s.sendall(header)
+
+            # chunking the message in 1024 bytes pieces
+            for i in range(0, msg_len, 1024):
+                s.sendall(ciphertext[i : i + 1024])
+                
+            print("[SUCCESS] Direct message sent!")
+            s.close()
+
+        except Exception as e:
+            print(f"\n[ERROR] Cannot send to {target_ip} (Error: {e})")
+            # auto-clenup logic for the agenda
+            if target_ip in self.peers:
+                self.peers.remove(target_ip)
+                print("[AUTO-CLEANUP] Deleted the node from table.")    
 
     def menu(self):
         """Interactive terminal menu replacing the separate shutdown_listener."""
         while not self.shutdown_flag.is_set():
             time.sleep(0.5) # delay to keep the console clean
             print("\nMASTER P2P MENU")
-            print("1. Send text message")
-            print("2. Refresh peers")
-            print("3 or 'quit' (Shuts down network)")
+            print("1. Send text message (from the console)")
+            print("2. Send a file (local, on this PC)")
+            print("3. Refresh peers")
+            print("4 or 'quit' (Shuts down network)")
             
             # Always ensure self.peers is a set
             if isinstance(self.peers, list):
@@ -220,25 +256,46 @@ class MasterNode:
                     print("[!] No nodes available to send to!")
                     continue
                     
-                target_idx = input("Choose node number ([0], [1]...): ")
+                target_idx = input("Choose node number ([0], [1], ...): ")
                 try:
                     target_ip = lista_peers[int(target_idx)]
                     msg = input("Write message: ")
-                    with open("master_msg.txt", "w") as f: 
-                        f.write(msg)
-                    self.send_file_p2p(target_ip, "master_msg.txt")
+                    self.send_direct_msg(target_ip, msg) # calling the send method
                 except (ValueError, IndexError):
                     print("[!] Invalid selection.")
 
-
             elif choice == '2':
+                if not lista_peers:
+                    print("[!] Table is empty!")
+                    continue
+                target_idx = input(f"Choose ID (0 - {len(lista_peers)-1}): ")
+                try:
+                    target_ip = lista_peers[int(target_idx)]
+                    
+                    # GUI file picker
+                    print("[*] Selection window is opening...")
+                    root = tk.Tk()
+                    root.withdraw() # hide the main empty window
+                    root.attributes('-topmost', True) # bring to front
+                    
+                    filepath = filedialog.askopenfilename(title="Choose a file to send")
+                    
+                    if filepath:
+                        print(f"[*] You selected: {filepath}")
+                        self.send_file_p2p(target_ip, filepath)
+                    else:
+                        print("[-] Selection canceled.")
+                except (ValueError, IndexError):
+                    print("[!] ID invalid.")
+
+            elif choice == '3':
                 print("\n[*] Broadcasting PING...")
                 active_peers = set()
                 offline_peers = set()
 
                 for ip in self.peers:
                     if ip == self.host:
-                        continue  # Don't ping self
+                        continue  # don't ping self
                     try:
                         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         s.settimeout(1.0) # waiting 1 s 
