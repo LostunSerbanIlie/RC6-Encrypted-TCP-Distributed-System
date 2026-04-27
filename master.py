@@ -161,7 +161,7 @@ class MasterNode:
                     if bytes_received % (1024 * 1024) == 0 or bytes_received == filesize:
                         mb_recv = bytes_received / (1024 * 1024)
                         total_mb = filesize / (1024 * 1024)
-                        print(f"  -> Downloaded: {mb_recv:.1f} MB / {total_mb:.2f} MB", end='\r')
+                        print(f"  -> Downloaded: {mb_recv:.2f} MB / {total_mb:.2f} MB", end='\r')
                 
                 print("\n[*] All chunks received. Decrypting with RC6 (This might take a while for large files)...")
                 
@@ -185,15 +185,21 @@ class MasterNode:
         server_socket.close()
         print("[MASTER-P2P] P2P Listener shut down cleanly.")
 
+
     def send_file_p2p(self, target_ip, filepath):
-        """Encrypts and sends a file to a specific peer."""
+        """Encrypts and sends a file to a specific peer, with progress prints for encryption and sending."""
         if not os.path.exists(filepath):
             return print("[ERROR] File does not exist!")
 
+        file_size = os.path.getsize(filepath)
+        print(f"[*] Preparing to encrypt file: {filepath} ({file_size / 1024:.2f} KB)")
         with open(filepath, "rb") as f:
             plaintext = f.read()
 
+        print("[*] Encrypting file with RC6... (this may take a while for large files)")
         ciphertext = self.rc6_engine.encrypt(plaintext)
+        print(f"[*] Encryption complete. Encrypted size: {len(ciphertext) / 1024:.2f} KB. Starting upload...")
+
         filename = os.path.basename(filepath)
         filesize = len(ciphertext)
         header = f"{filename}|{filesize}".ljust(256, '\x00').encode('utf-8')
@@ -202,20 +208,20 @@ class MasterNode:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((target_ip, 9000))
             s.sendall(header)
-            
+
             # CHUNKING: send the encrypted data in blocks of 1024 bytes
             bytes_sent = 0
             for i in range(0, filesize, 1024):
                 chunk = ciphertext[i : i + 1024]
                 s.sendall(chunk)
                 bytes_sent += len(chunk)
-                
+
                 # shows progress for every MB sent
                 if bytes_sent % (1024 * 1024) == 0 or bytes_sent == filesize:
                     mb_sent = bytes_sent / (1024 * 1024)
                     total_mb = filesize / (1024 * 1024)
-                    print(f"  -> Uploaded: {mb_sent:.1f} MB / {total_mb:.2f} MB", end='\r')
-                    
+                    print(f"  -> Uploaded: {mb_sent:.2f} MB / {total_mb:.2f} MB", end='\r')
+
             print(f"\n[SUCCESS] File sent successfully to {target_ip}!")
 
             s.close()

@@ -91,7 +91,7 @@ def encrypt(public_key, plaintext_bytes):
     
     # Safety: N must be greater than message M
     if m_int >= N:
-        raise ValueError("Mesajul este prea mare pentru a fi criptat cu aceasta cheie N!")
+        raise ValueError("Message is too big to be encrypted with this N!")
         
     # 2. Math: C = M^e mod N
     # Note: pow() uses efficient exponentiation
@@ -114,3 +114,33 @@ def decrypt(private_key, ciphertext_bytes):
     
     # 3. Convert integer M back to original 16 bytes
     return m_int.to_bytes(16, byteorder='big')
+
+
+def main():
+    print("[RSA] Generating keypair...")
+    public_key, private_key = generate_keypair(256)  # increased keysize so all 16-byte test vectors fit
+    print(f"Public key: {public_key}\nPrivate key: {private_key}")
+
+    # test vectors: 16-byte messages
+    test_vectors = [
+        b'\x00' * 16,
+        b'\x01' * 16,
+        b'\xff' * 16,
+        b'Hello, RSA test!',
+        b'1234567890abcdef',
+        bytes(range(16)),
+    ]
+
+    for i, msg in enumerate(test_vectors):
+        print(f"\nTest vector {i+1}:")
+        print(f"Original: {msg}")
+        ct = encrypt(public_key, msg)
+        print(f"Encrypted: {ct.hex()}")
+        pt = decrypt(private_key, ct)
+        print(f"Decrypted: {pt}")
+        assert pt == msg, f"Decryption failed for vector {i+1}!"
+    print("\nAll test vectors passed.")
+
+
+if __name__ == "__main__":
+    main()
